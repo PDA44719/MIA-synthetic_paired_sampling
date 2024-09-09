@@ -165,7 +165,10 @@ def main():
 
     trained_models, all_results = fit_validate_classifiers(X_train, y_train, X_test, y_test, models = MODELS, cv = CV)
 
-    NAIVE_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{datetime.datetime.now()}_naive.csv'
+    if PAIRED_SAMPLING:
+        NAIVE_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{TARGET_RECORD_ID}record_{SEED}seed_naive_paired.csv'
+    else:
+        NAIVE_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{TARGET_RECORD_ID}record_{SEED}seed_naive_random.csv'
     save_output(NAIVE_OUTPUT_PATH, vars(args), all_results, utility_results)
 
     ### (2) Then do the query based extraction
@@ -194,7 +197,10 @@ def main():
 
     trained_models, all_results = fit_validate_classifiers(X_train, y_train, X_test, y_test, models = MODELS, cv = CV)
 
-    QUERY_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{datetime.datetime.now()}_query.csv'
+    if PAIRED_SAMPLING:
+        QUERY_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{TARGET_RECORD_ID}record_{SEED}seed_query_paired.csv'
+    else:
+        QUERY_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{TARGET_RECORD_ID}record_{SEED}seed_query_random.csv'
     save_output(QUERY_OUTPUT_PATH, vars(args), all_results, utility_results)
 
     ### (3) Then do set based classifier with TARGETattention
@@ -213,7 +219,10 @@ def main():
                                             path_best_model=f'{OUTPUT_DIR}/best_model_{TARGET_RECORD_ID}_targetattention.pt',
                                             model_type='TargetAttention', top_X=100)
 
-    TARGETATTENTION_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{datetime.datetime.now()}_targetattention.csv'
+    if PAIRED_SAMPLING:
+        TARGETATTENTION_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{TARGET_RECORD_ID}_{SEED}seed_targetattention_paired.csv'
+    else:
+        TARGETATTENTION_OUTPUT_PATH = f'{OUTPUT_DIR}/output_{TARGET_RECORD_ID}_{SEED}seed_targetattention_random.csv'
     save_output(TARGETATTENTION_OUTPUT_PATH, vars(args), all_results, utility_results)
     
     print('succes!')
