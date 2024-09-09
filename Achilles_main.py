@@ -7,7 +7,7 @@ import datetime
 from src.data_prep import read_data, read_metadata, select_columns, discretize_dataset, \
     normalize_cont_cols, sample_split_data_for_attack, get_target_record
 from src.generators import get_generator
-from src.shadow_data import create_shadow_training_data_membership
+from src.shadow_data import create_shadow_training_data_membership, create_shadow_training_data_membership_paired_sampling
 from src.set_based_classifier import fit_set_based_classifier
 from src.feature_extractors import fit_ohe, get_feature_extractors, apply_feature_extractor
 from src.classifiers import drop_zero_cols, scale_features, select_features, fit_validate_classifiers
@@ -59,6 +59,8 @@ parser.add_argument("--compute_utility", type = str2bool, default = 'False',
                     help = "Compute the utility of the given generator")
 parser.add_argument("--seed", type = int, default = 42,
                     help = "the random seed to be applied for reproducibility")
+parser.add_argument("--paired_sampling", type = bool, default = False,
+                    help = "whether paired sampling is used (True) or random sampling (False)")
 
 args = parser.parse_args()
 
@@ -77,6 +79,7 @@ CV = args.cv
 FEAT_SELECTION = args.feat_selection
 COMPUTE_UTILITY = args.compute_utility
 SEED = args.seed
+PAIRED_SAMPLING = args.paired_sampling
 
 # set the seeds
 random.seed(SEED)
@@ -107,13 +110,22 @@ def main():
     blockPrint()
     # get all datasets for shadow training, for now only MIA
     train_seeds = list(range(N_POS_TRAIN * 2))
-    datasets_train, labels_train, datasets_train_utility = create_shadow_training_data_membership(df = df_aux, meta_data = meta_data,
+    if PAIRED_SAMPLING:
+        datasets_train, labels_train, datasets_train_utility = create_shadow_training_data_membership_paired_sampling(df = df_aux, meta_data = meta_data,
+                                        target_record = target_record, generator = generator, n_original = N_ORIGINAL,
+                                        n_synth = N_SYNTHETIC, n_pos = N_POS_TRAIN, seeds = train_seeds)
+        test_seeds = list(range(N_POS_TRAIN * 2, N_POS_TRAIN * 2 + N_POS_TEST * 2)) # make it non overlapping
+        datasets_test, labels_test, _ = create_shadow_training_data_membership_paired_sampling(df = df_test, meta_data = meta_data,
                                     target_record = target_record, generator = generator, n_original = N_ORIGINAL,
-                                    n_synth = N_SYNTHETIC, n_pos = N_POS_TRAIN, seeds = train_seeds)
-    test_seeds = list(range(N_POS_TRAIN * 2, N_POS_TRAIN * 2 + N_POS_TEST * 2)) # make it non overlapping
-    datasets_test, labels_test, _ = create_shadow_training_data_membership(df = df_test, meta_data = meta_data,
-                                  target_record = target_record, generator = generator, n_original = N_ORIGINAL,
-                                   n_synth = N_SYNTHETIC, n_pos = N_POS_TEST, seeds = test_seeds)
+                                    n_synth = N_SYNTHETIC, n_pos = N_POS_TEST, seeds = test_seeds)
+    else:
+        datasets_train, labels_train, datasets_train_utility = create_shadow_training_data_membership(df = df_aux, meta_data = meta_data,
+                                        target_record = target_record, generator = generator, n_original = N_ORIGINAL,
+                                        n_synth = N_SYNTHETIC, n_pos = N_POS_TRAIN, seeds = train_seeds)
+        test_seeds = list(range(N_POS_TRAIN * 2, N_POS_TRAIN * 2 + N_POS_TEST * 2)) # make it non overlapping
+        datasets_test, labels_test, _ = create_shadow_training_data_membership(df = df_test, meta_data = meta_data,
+                                    target_record = target_record, generator = generator, n_original = N_ORIGINAL,
+                                    n_synth = N_SYNTHETIC, n_pos = N_POS_TEST, seeds = test_seeds)
     enablePrint()
 
     # fit one hot encoding
