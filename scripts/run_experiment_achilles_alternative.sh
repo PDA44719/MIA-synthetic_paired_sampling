@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python Achilles_main.py --path_to_data='./data/2011 Census Microdata Teaching File_OG.csv' \
+python Achilles_alternative.py --path_to_data='./data/2011 Census Microdata Teaching File_OG.csv' \
                 --path_to_metadata='./data/2011 Census Microdata Teaching Discretized.json' \
                 --target_record_id=$2 \
                 --output_dir='./results_experiments' \
@@ -25,4 +25,4 @@ python Achilles_main.py --path_to_data='./data/2011 Census Microdata Teaching Fi
                 --n_pos_train=500 \
                 --n_pos_test=100 \
                 --seed=$1 \
-                --paired_sampling=True
+                --fixed_reference=True
