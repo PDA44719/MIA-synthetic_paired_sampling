@@ -14,13 +14,13 @@ def run_pipeline_parallel(args):
 
 def run_pipeline(i, df_aux, target_record, datasets_test, labels_test, target_record_id, feat_selection,
                  models, cv, seed, continuous_cols, categorical_cols, meta_data, generator, n_original,
-                 n_synthetic, n_pos_train, train_seeds, scenario, name_generator, args):
+                 n_synthetic, n_pos_train, train_seeds, scenario, name_generator, synthetic_subdir_name, args):
     """
     This function is call a part of the main() fonction, by each thread.
     """
 
     #save path
-    save_dir = f'./results_experiments/synthetic_only/scenario_{scenario}/target_{target_record_id}/{name_generator}_{n_synthetic}/'
+    save_dir = f'./results_experiments/{synthetic_subdir_name}/scenario_{scenario}/target_{target_record_id}/{name_generator}_{n_synthetic}/'
     
     #We create the directory if needed
     if not os.path.exists(save_dir):

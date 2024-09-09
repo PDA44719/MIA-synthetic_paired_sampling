@@ -10,7 +10,7 @@ from tqdm import tqdm
 from src.data_prep import read_data, read_metadata, select_columns, discretize_dataset, \
     get_target_record, normalize_cont_cols
 from src.generators import get_generator
-from src.shadow_data import create_shadow_training_data_membership, create_shadow_training_data_membership_synthetic_only_s3
+from src.shadow_data import create_shadow_training_data_membership, create_shadow_training_data_membership_synthetic_only_s3, create_shadow_training_data_membership_paired_sampling
 from src.utils import blockPrint, enablePrint, str2bool, str2list
 from src.synthetic_only_parallel import run_pipeline_parallel
 
@@ -23,9 +23,11 @@ parser.add_argument("--path_to_data", type = str, default = 'data/2011 Census Mi
                     help = "path to all original data in csv format")
 parser.add_argument("--path_to_metadata", type = str, default = 'data/2011 Census Microdata Teaching Discretized.json',
                     help = "path to metadata of the csv in json format")
-parser.add_argument("--cols_to_select", type = str2list, default = "['Age',  'Ethnic Group',  'Residence Type',  'Industry', 'Health',\
- 'Hours worked per week' , 'Country of Birth',  'Religion', \
- 'Approximated Social Grade',  'Family Composition' , 'Marital Status']",
+#parser.add_argument("--cols_to_select", type = str2list, default = "['Age',  'Ethnic Group',  'Residence Type',  'Industry', 'Health',\
+# 'Hours worked per week' , 'Country of Birth',  'Religion', \
+# 'Approximated Social Grade',  'Family Composition' , 'Marital Status']",
+#                    help = "if not all, specify a list of cols to include in the pipeline")
+parser.add_argument("--cols_to_select", type = str2list, default = "['all'],
                     help = "if not all, specify a list of cols to include in the pipeline")
 parser.add_argument("--output_path", type = str, default = None, help = "path to save the output in csv format")
 parser.add_argument("--name_generator", type = str, default = 'privbayes', help = "name of the synthetic data generator")
@@ -58,6 +60,8 @@ parser.add_argument("--unique", type=str2bool, default='True',
                     help= "If we want to use only a single prediction in the case of the synthetic option")
 parser.add_argument("--m", type=int, default=50,
                     help= "The number of time we generate N_SYNTH")
+parser.add_argument("--paired_sampling", type = bool, default = False,
+                    help = "whether paired sampling is used (True) or random sampling (False)")
 
 
 
@@ -68,7 +72,7 @@ PATH_TO_METADATA = args.path_to_metadata
 COLS_TO_SELECT = args.cols_to_select
 OUTPUT_PATH = args.output_path
 if OUTPUT_PATH is None:
-    OUTPUT_PATH = './results_experiments/output_' + str(datetime.datetime.now()) + '.csv'
+    OUTPUT_PATH = './results_experiments/output_synthetic_' + str(datetime.datetime.now()) + '.csv'
 TARGET_RECORD_ID = args.target_record_id
 NAME_GENERATOR = args.name_generator
 EPSILON = args.epsilon
@@ -83,6 +87,7 @@ SEED = args.seed
 SCENARIO = args.synthetic_scenario
 UNIQUE = args.unique
 M = args.m
+PAIRED_SAMPLING = args.paired_sampling
 
 
 assert SCENARIO in [1,2,3]
@@ -129,9 +134,20 @@ def main():
                                    n_synth = N_SYNTHETIC, n_pos = N_POS_TEST, seeds = test_seeds, target_record = target_record, m = M)
     else :
         #Scenario S1 and S2
-        datasets_test, labels_test, _ = create_shadow_training_data_membership(df = df_wo_target, meta_data = meta_data,
-                                  target_record = target_record, generator = generator, n_original = N_ORIGINAL,
-                                   n_synth = M*N_SYNTHETIC, n_pos = N_POS_TEST, seeds = test_seeds)
+        if PAIRED_SAMPLING:
+            datasets_test, labels_test, _ = create_shadow_training_data_membership_paired_sampling(df = df_wo_target, meta_data = meta_data,
+                                    target_record = target_record, generator = generator, n_original = N_ORIGINAL,
+                                    n_synth = M*N_SYNTHETIC, n_pos = N_POS_TEST, seeds = test_seeds)
+        else:
+            datasets_test, labels_test, _ = create_shadow_training_data_membership(df = df_wo_target, meta_data = meta_data,
+                                    target_record = target_record, generator = generator, n_original = N_ORIGINAL,
+                                    n_synth = M*N_SYNTHETIC, n_pos = N_POS_TEST, seeds = test_seeds)
+
+    # Specify the name for the subdirectory
+    if PAIRED_SAMPLING:
+        synthetic_subdir_name = 'synthetic_only_paired'
+    else:
+        synthetic_subdir_name = 'synthetic_only'
 
     #Argument for the // code
     t1 = time()
@@ -153,14 +169,14 @@ def main():
         #UNIQUE: if we want a unique prediction from the classifier on the test_dataset
         if SCENARIO == 3:
             if UNIQUE:
-                args_list.append((l, dataset_aux, target_record, [dataset_test], [labels_test[l]], TARGET_RECORD_ID, FEAT_SELECTION, MODELS, CV, SEED, continuous_cols, categorical_cols, meta_data, generator, N_ORIGINAL,N_SYNTHETIC,N_POS_TRAIN,train_seeds, SCENARIO, NAME_GENERATOR, args))
+                args_list.append((l, dataset_aux, target_record, [dataset_test], [labels_test[l]], TARGET_RECORD_ID, FEAT_SELECTION, MODELS, CV, SEED, continuous_cols, categorical_cols, meta_data, generator, N_ORIGINAL,N_SYNTHETIC,N_POS_TRAIN,train_seeds, SCENARIO, NAME_GENERATOR, synthetic_subdir_name, args))
             else :
-                args_list.append((l, dataset_aux, target_record, [dataset_test.sample(n=N_SYNTHETIC, random_state=10*j) for j in range(1,11)], [labels_test[l] for _ in range(10) ], TARGET_RECORD_ID, FEAT_SELECTION, MODELS, CV, SEED, continuous_cols, categorical_cols, meta_data, generator, N_ORIGINAL,N_SYNTHETIC,N_POS_TRAIN,train_seeds, SCENARIO, NAME_GENERATOR, args))
+                args_list.append((l, dataset_aux, target_record, [dataset_test.sample(n=N_SYNTHETIC, random_state=10*j) for j in range(1,11)], [labels_test[l] for _ in range(10) ], TARGET_RECORD_ID, FEAT_SELECTION, MODELS, CV, SEED, continuous_cols, categorical_cols, meta_data, generator, N_ORIGINAL,N_SYNTHETIC,N_POS_TRAIN,train_seeds, SCENARIO, NAME_GENERATOR, synthetic_subdir_name, args))
         else:
             if UNIQUE:
-                args_list.append((l, dataset_aux, target_record, [dataset_test.head(N_SYNTHETIC)], [labels_test[l]], TARGET_RECORD_ID, FEAT_SELECTION, MODELS, CV, SEED, continuous_cols, categorical_cols, meta_data, generator, N_ORIGINAL,N_SYNTHETIC,N_POS_TRAIN,train_seeds, SCENARIO, NAME_GENERATOR, args))
+                args_list.append((l, dataset_aux, target_record, [dataset_test.head(N_SYNTHETIC)], [labels_test[l]], TARGET_RECORD_ID, FEAT_SELECTION, MODELS, CV, SEED, continuous_cols, categorical_cols, meta_data, generator, N_ORIGINAL,N_SYNTHETIC,N_POS_TRAIN,train_seeds, SCENARIO, NAME_GENERATOR, synthetic_subdir_name, args))
             else :
-                args_list.append((l, dataset_aux, target_record, [dataset_test.sample(n=N_SYNTHETIC, random_state=10*j) for j in range(1,11)], [labels_test[l] for _ in range(10) ], TARGET_RECORD_ID, FEAT_SELECTION, MODELS, CV, SEED, continuous_cols, categorical_cols, meta_data, generator, N_ORIGINAL,N_SYNTHETIC,N_POS_TRAIN,train_seeds, SCENARIO, NAME_GENERATOR, args))
+                args_list.append((l, dataset_aux, target_record, [dataset_test.sample(n=N_SYNTHETIC, random_state=10*j) for j in range(1,11)], [labels_test[l] for _ in range(10) ], TARGET_RECORD_ID, FEAT_SELECTION, MODELS, CV, SEED, continuous_cols, categorical_cols, meta_data, generator, N_ORIGINAL,N_SYNTHETIC,N_POS_TRAIN,train_seeds, SCENARIO, NAME_GENERATOR, synthetic_subdir_name, args))
 
     results = []
     #we perform the experiment by batch of size nbr_cores
