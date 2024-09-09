@@ -14,11 +14,46 @@ def create_shadow_training_data_membership(df: pd.DataFrame, meta_data: list,
     assert len(seeds) == n_pos * 2
 
     for i in tqdm(range(n_pos)):
+        # Random sampling used here
         indices_sub = sample(list(df.index), n_original - 1)
         df_sub = df.loc[indices_sub]
         df_w_target = pd.concat([df_sub, target_record], axis=0)
         indices_wo_target = sample(list(df.index), n_original)
         df_wo_target = df.loc[indices_wo_target]  
+
+        # let's create a synthetic dataset from data with the target record
+        synthetic_from_target = generator.fit_generate(dataset=df_w_target, metadata=meta_data,
+                                                       size=n_synth, seed = seeds[2 * i])
+        datasets.append(synthetic_from_target)
+        labels.append(1)
+
+        # let's create a synthetic dataset from data without the target record
+        synthetic_wo_target = generator.fit_generate(dataset=df_wo_target, metadata=meta_data,
+                                                       size=n_synth, seed = seeds[2 * i + 1])
+
+        datasets.append(synthetic_wo_target)
+        labels.append(0)
+        
+        datasets_utility.append({'Real':{'With':df_w_target,'Without':df_wo_target}, 'Synth':{'With':synthetic_from_target,'Without':synthetic_wo_target}})
+
+    return datasets, labels, datasets_utility
+
+def create_shadow_training_data_membership_paired_sampling(df: pd.DataFrame, meta_data: list,
+                                target_record: pd.DataFrame, generator: Generator,
+                                n_original: int, n_synth: int, n_pos: int, seeds: list) -> tuple:
+    datasets = []
+    datasets_utility = []
+    labels = []
+    
+    assert len(seeds) == n_pos * 2
+
+    for i in tqdm(range(n_pos)):
+        # Paired Sampling introduced here
+        indices_wo_target = sample(list(df.index), n_original)
+        df_wo_target = df.loc[indices_wo_target]  
+        indices_wo_target.pop()  # Remove the reference record
+        df_sub = df.loc[indices_wo_target]
+        df_w_target = pd.concat([df_sub, target_record], axis=0)  # Add the target
 
         # let's create a synthetic dataset from data with the target record
         synthetic_from_target = generator.fit_generate(dataset=df_w_target, metadata=meta_data,
